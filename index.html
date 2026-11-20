@@ -66,6 +66,7 @@ svg{width:100%;height:auto;display:block}
 .chk{display:flex;align-items:center;gap:6px;font-size:.88rem;font-weight:600;color:var(--muted);margin:0 0 0 6px;cursor:pointer}
 .small{font-size:.82rem;color:var(--muted);margin:10px 0 0}
 @media print{body{background:#fff}.bar,textarea,#exmsg,.hero .unitbox{display:none!important}}
+td select{min-width:92px}
 </style>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0b6e8a" media="(prefers-color-scheme: light)">
@@ -74,8 +75,8 @@ svg{width:100%;height:auto;display:block}
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Kalkulator Cargo">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
 </head>
 <body>
 <main>
@@ -101,11 +102,11 @@ svg{width:100%;height:auto;display:block}
 <section>
 <h2>Daftar barang</h2>
 <div class="tw"><table>
-<thead><tr><th></th><th>Nama</th><th>Bentuk</th><th>P (<span class="u">cm</span>)</th><th>L (<span class="u">cm</span>)</th><th>T (<span class="u">cm</span>)</th><th>Berat/unit (kg)</th><th>Jumlah</th><th>Boleh ditumpuk</th><th></th></tr></thead>
+<thead><tr><th></th><th>Nama</th><th>Bentuk</th><th>Posisi</th><th>P (<span class="u">cm</span>)</th><th>L (<span class="u">cm</span>)</th><th>T (<span class="u">cm</span>)</th><th>Berat/unit (kg)</th><th>Jumlah</th><th>Boleh ditumpuk</th><th></th></tr></thead>
 <tbody id="rows"></tbody>
 </table></div>
 <div class="bar"><button class="p" id="add">Tambah barang</button><button id="reset">Kosongkan semua</button></div>
-<p class="small">Pilihan <b>Bentuk</b> hanya mengubah gambar (2D, samping, dan 3D). Ukuran P, L, T tetap diisi seperti biasa. Untuk <b>Bulat</b>, panjang pipa mengikuti sisi yang paling panjang, dan penampangnya mengikuti dua sisi lainnya (isi dengan diameter). Contoh pipa rebah: P = panjang, L = diameter, T = diameter. Perhitungan muat tetap memakai kotak pembatas.</p>
+<p class="small">Pilihan <b>Bentuk</b> hanya mengubah gambar (2D, samping, dan 3D). Ukuran P, L, T tetap diisi seperti biasa. Untuk <b>Bulat</b>, panjang pipa mengikuti sisi yang paling panjang, dan penampangnya mengikuti dua sisi lainnya (isi dengan diameter). Contoh pipa rebah: P = panjang, L = diameter, T = diameter. Kolom <b>Posisi</b> muncul untuk Bulat: <b>Berdiri (drum)</b> membuatnya tegak, dengan P dan L = diameter dan T = tinggi drum. <b>Rebah (pipa)</b> membuatnya tidur memanjang, dan <b>Otomatis</b> mengikuti sisi terpanjang. Perhitungan muat tetap memakai kotak pembatas.</p>
 </section>
 
 <section>
@@ -164,6 +165,8 @@ var $=function(i){return document.getElementById(i)};
 var UNITS={mm:.1,cm:1,m:100},unit="cm";
 var SHAPE={box:"Kotak",round:"Bulat"};
 function shapeOpts(v){return Object.keys(SHAPE).map(function(k){return '<option value="'+k+'"'+((v||"box")===k?" selected":"")+">"+SHAPE[k]+"</option>"}).join("")}
+var POS={auto:"Otomatis",up:"Berdiri (drum)",lie:"Rebah (pipa)"};
+function posOpts(v){return Object.keys(POS).map(function(k){return '<option value="'+k+'"'+((v||"auto")===k?" selected":"")+">"+POS[k]+"</option>"}).join("")}
 function toCm(v){return v*UNITS[unit]}
 function fromCm(v){return parseFloat((v/UNITS[unit]).toFixed(unit==="m"?4:(unit==="cm"?2:1)))}
 function fmtL(v){return fromCm(v).toLocaleString("id-ID")+" "+unit}
@@ -183,6 +186,7 @@ function renderRows(){
   h+='<tr><td><span class="sw" style="background:'+color(i)+';border-radius:'+(it.s&&it.s!=="box"?"50%":"5px")+'"></span></td>'+
   '<td><input type="text" data-i="'+i+'" data-k="n" value="'+esc(it.n)+'" aria-label="Nama"></td>'+
   '<td><select data-i="'+i+'" data-k="s" aria-label="Bentuk">'+shapeOpts(it.s)+'</select></td>'+
+  '<td>'+(it.s==="round"?'<select data-i="'+i+'" data-k="o" aria-label="Posisi" style="min-width:112px">'+posOpts(it.o)+'</select>':'<span class="small">-</span>')+'</td>'+
   ["l","w","h","kg","q"].map(function(k){return '<td><input type="number" min="0" step="any" data-i="'+i+'" data-k="'+k+'" value="'+(k==="l"||k==="w"||k==="h"?fromCm(it[k]):it[k])+'"'+""+' aria-label="'+k+'"></td>'}).join("")+
   '<td><input type="checkbox" data-i="'+i+'" data-k="st"'+(it.st?" checked":"")+' aria-label="Boleh ditumpuk"></td>'+
   '<td><button data-del="'+i+'" aria-label="Hapus">Hapus</button></td></tr>';
@@ -192,7 +196,7 @@ function renderRows(){
 $("rows").addEventListener("input",function(e){
  var t=e.target,i=t.dataset.i,k=t.dataset.k;if(i===undefined)return;
  var v=parseFloat(t.value)||0;if(k==="l"||k==="w"||k==="h")v=toCm(v);
- items[i][k]=(k==="n"||k==="s")?t.value:(k==="st"?t.checked:v);
+ items[i][k]=(k==="n"||k==="s"||k==="o")?t.value:(k==="st"?t.checked:v);
  if(k==="s")renderRows();
  calc();
 });
@@ -439,6 +443,10 @@ function render3d(L,W,H,rects){
    g.add(m);
    var e=new THREE.LineSegments(new THREE.EdgesGeometry(geo,40),new THREE.LineBasicMaterial({color:0x1d2b36}));
    e.position.copy(m.position);e.scale.copy(m.scale);g.add(e);
+   if(r.s==="round"&&axisOf(r)==="y"){[.28,.72].forEach(function(f){
+    var hp=new THREE.Mesh(new THREE.CylinderGeometry(1,1,1,32),new THREE.MeshLambertMaterial({color:new THREE.Color(color(r.gi)).multiplyScalar(.7)}));
+    hp.position.set(m.position.x,(r.z||0)+r.hh*f,m.position.z);
+    hp.scale.set(r.w/2*1.01,Math.max(1.5,r.hh*.05),r.h/2*1.01);g.add(hp)})}
   }
  });
  show3();
@@ -480,7 +488,12 @@ function stat(a,b,r,noOver){
  var p=Math.min(100,Math.max(0,r*100));
  return '<div class="stat"><span>'+a+'</span><b>'+b+'</b><div class="meter"><i class="'+(r>1&&!noOver?"over":"")+'" style="width:'+p+'%"></i></div></div>';
 }
-function axisOf(r){var a=Math.max(r.w,r.h,r.hh);return a===r.hh?"y":(a===r.w?"x":"z")}
+function axisOf(r){
+ var o=items[r.gi]&&items[r.gi].o;
+ if(o==="up")return "y";
+ if(o==="lie")return r.w>=r.h?"x":"z";
+ var a=Math.max(r.w,r.h,r.hh);return a===r.hh?"y":(a===r.w?"x":"z");
+}
 function shapeTop(r,fill,op,stroke,sw,dash){
  var c=' fill="'+fill+'" fill-opacity="'+op+'" stroke="'+stroke+'" stroke-width="'+sw+'"'+(dash?' stroke-dasharray="'+dash+'"':'');
  if(r.s!=="round")return '<rect x="'+r.x+'" y="'+r.y+'" width="'+r.w+'" height="'+r.h+'"'+c+'/>';
